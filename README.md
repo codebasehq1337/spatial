@@ -1,26 +1,24 @@
 # spatial
 
-A 3D file explorer. Fly through your filesystem.
+A 3D file explorer. Fly through your filesystem with WASD.
 
-Your folders are floating cards in a dark room. Move with WASD. Click to
-enter. Files open in a panel — images render inline, text renders as
-monospace. Everything you see is real. It's reading your actual disk.
+![screenshot](screenshot.png)
+
+Your folders are floating manila folders with paper inside. Files are
+cards with real content previews — text files show their first lines,
+images render as thumbnails. Everything you see is real. It's reading
+your actual disk.
 
 Runs entirely on your machine. Nothing leaves it.
 
-## Install
+## Run it
 
-Requires Node 18 or newer.
-
-    git clone https://github.com/YOURUSERNAME/spatial
+    git clone https://github.com/codebasehq1337/spatial
     cd spatial
     npm install
-
-## Run
-
     npm start
 
-Then open **http://localhost:7331** in your browser.
+Open http://localhost:7331 in your browser.
 
 By default it opens your home directory. To use a different root:
 
@@ -32,30 +30,29 @@ By default it opens your home directory. To use a different root:
 |-----|--------|
 | `W` `A` `S` `D` | Move |
 | `Q` `E` | Down / up |
-| Mouse | Look |
+| Drag | Look around |
 | Scroll | Move forward / back |
-| Click | Open folder or file |
+| Click | Open a folder or file |
 | `Backspace` | Go up one level |
-| `Esc` | Close file viewer |
+| `Esc` | Close the file viewer |
 
 Hold `Shift` to move faster.
 
 ## How it works
 
-Two pieces.
+Two pieces:
 
 **The server** (Node.js) reads your filesystem and streams folder
 contents over a WebSocket. It also serves the client. Every path is
 resolved against the root and any attempt to escape it gets clamped
-back — the browser can't access anything outside your home directory
-(or whatever you set `SPATIAL_ROOT` to).
+back — the browser can't touch anything outside your home directory.
 
-**The client** (in the browser) draws the file tree using Three.js.
-It never touches the filesystem directly; it just asks the server for
-listings and file contents.
+**The client** (browser) draws the file tree using Three.js. It never
+touches the filesystem directly; it just asks the server for listings
+and file contents.
 
-This is the same architecture VS Code uses — a local process that has
-file access, and a browser that doesn't.
+Same architecture VS Code uses — a local process that has file access,
+and a browser that doesn't.
 
 ## Why
 
