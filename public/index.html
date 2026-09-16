@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>spatial</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>▣</text></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #03040a;
+    --ink: #e8e9ee;
+    --ink-2: #9296a3;
+    --ink-3: #5a5f6b;
+    --amber: #ffb454;
+    --green: #7ee787;
+    --red: #ff6b6b;
+    --line: #1c1f28;
+    --panel: #0d0f16;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--mono);
+    overflow: hidden;
+    height: 100%;
+    width: 100%;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #gl {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    position: fixed;
+    inset: 0;
+    cursor: crosshair;
+  }
+
+  /* ----- vignette overlay ----- */
+  .vignette {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 5;
+    background: radial-gradient(
+      ellipse at center,
+      transparent 30%,
+      rgba(0,0,0,0.35) 75%,
+      rgba(0,0,0,0.7) 100%
+    );
+  }
+
+  /* ----- HUD ----- */
+  .hud {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .path-bar {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: rgba(13, 15, 22, 0.82);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    font-size: 0.78rem;
+    color: var(--ink-2);
+    max-width: 60vw;
+  }
+  .path-bar .crumbs { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .path-bar .crumb { color: var(--ink-2); }
+  .path-bar .crumb.last { color: var(--ink); }
+  .path-bar .sep { color: var(--ink-3); margin: 0 6px; }
+  .path-bar .back {
+    color: var(--ink-3);
+    padding: 3px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid var(--line);
+    font-size: 0.7rem;
+    transition: all 0.15s ease;
+  }
+  .path-bar .back:hover { color: var(--amber); border-color: var(--amber); }
+  .path-bar .back.off { opacity: 0.25; pointer-events: none; }
+
+  .controls {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    pointer-events: none;
+    font-size: 0.72rem;
+    color: var(--ink-3);
+    line-height: 1.9;
+  }
+  .controls kbd {
+    display: inline-block;
+    min-width: 22px;
+    padding: 2px 6px;
+    background: rgba(13, 15, 22, 0.85);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    color: var(--ink-2);
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+  }
+
+  .status {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    pointer-events: none;
+    padding: 9px 14px;
+    background: rgba(13, 15, 22, 0.82);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    font-size: 0.72rem;
+    color: var(--ink-3);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .status .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--red);
+    transition: background 0.3s ease;
+  }
+  .status.connected .dot {
+    background: var(--green);
+    box-shadow: 0 0 0 3px rgba(126, 231, 135, 0.15);
+  }
+
+  /* ----- loader ----- */
+  .loader {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: var(--bg);
+    z-index: 100;
+    transition: opacity 0.6s ease;
+  }
+  .loader.hidden { opacity: 0; pointer-events: none; }
+  .loader .inner { text-align: center; }
+  .loader .omega {
+    font-size: 3rem;
+    color: var(--amber);
+    margin-bottom: 20px;
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  .loader .msg { font-size: 0.82rem; color: var(--ink-3); }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.94); }
+  }
+
+  /* ----- modal ----- */
+  .modal {
+    position: fixed;
+    inset: 0;
+    display: none;
+    z-index: 50;
+    background: rgba(3, 4, 10, 0.8);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 5vh 5vw;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal.open { display: flex; }
+
+  .modal-inner {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 1100px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 40px 100px rgba(0, 0, 0, 0.8);
+    animation: modalIn 0.22s ease-out;
+  }
+  @keyframes modalIn {
+    from { opacity: 0; transform: translateY(10px) scale(0.99); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .modal-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.015);
+  }
+  .modal-head .fname {
+    font-size: 0.86rem;
+    color: var(--ink);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .modal-head .fmeta { font-size: 0.72rem; color: var(--ink-3); }
+  .modal-head .close {
+    padding: 5px 12px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--ink-3);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .modal-head .close:hover { color: var(--red); border-color: var(--red); }
+
+  .modal-body {
+    overflow: auto;
+    padding: 0;
+    flex: 1;
+    min-height: 0;
+  }
+  .modal-body pre {
+    margin: 0;
+    padding: 24px;
+    font-size: 0.82rem;
+    line-height: 1.65;
+    color: #c9cdd6;
+    white-space: pre;
+    overflow: auto;
+  }
+  .modal-body img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
+  }
+  .modal-body .empty {
+    padding: 60px 22px;
+    text-align: center;
+    font-size: 0.82rem;
+    color: var(--ink-3);
+  }
+
+  /* ----- tooltip ----- */
+  .tooltip {
+    position: fixed;
+    pointer-events: none;
+    padding: 7px 12px;
+    background: rgba(3, 4, 10, 0.94);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--ink);
+    z-index: 30;
+    display: none;
+    white-space: nowrap;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .tooltip .dim { color: var(--ink-3); }
+</style>
+</head>
+<body>
+
+<canvas id="gl"></canvas>
+<div class="vignette"></div>
+
+<div class="hud">
+  <div class="path-bar">
+    <span class="back off" id="backBtn">← up</span>
+    <span class="crumbs" id="crumbs">/</span>
+  </div>
+
+  <div class="status" id="status">
+    <span class="dot"></span>
+    <span id="statusText">connecting…</span>
+  </div>
+
+  <div class="controls">
+    <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <kbd>Q</kbd><kbd>E</kbd> down / up</div>
+    <div>drag to look · scroll to zoom</div>
+    <div><kbd>click</kbd> open · <kbd>backspace</kbd> up · <kbd>esc</kbd> close</div>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<div class="modal" id="modal">
+  <div class="modal-inner">
+    <div class="modal-head">
+      <span class="fname" id="modalName">—</span>
+      <span class="fmeta" id="modalMeta"></span>
+      <button class="close" id="modalClose">esc</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<div class="loader" id="loader">
+  <div class="inner">
+    <div class="omega">▣</div>
+    <div class="msg" id="loaderMsg">reading filesystem…</div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.161.0/build/three.module.js"
+  }
+}
+</script>
+<script type="module" src="/client.js"></script>
+
+</body>
+</html>
