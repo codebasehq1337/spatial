@@ -13,7 +13,7 @@ Runs entirely on your machine. Nothing leaves it.
 
 ## Run it
 
-    git clone https://github.com/codebasehq1337/spatial
+    git clone https://github.com/loudified/spatial
     cd spatial
     npm install
     npm start
